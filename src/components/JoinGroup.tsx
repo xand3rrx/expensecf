@@ -76,12 +76,15 @@ const JoinGroup = () => {
       return
     }
 
+    // Debug current state
+    console.group('Join Group Debug')
+    console.log('Current user:', username)
+    console.log('Attempting to join group:', trimmedGroupId)
+    debugStorage()
+
     // Search for the group in all users' storage
     let foundGroup: CoupleGroup | null = null
     let groupOwner: string | null = null
-
-    // Debug: Log the group ID we're looking for
-    console.log('Looking for group ID:', trimmedGroupId)
 
     // Search through localStorage for the group
     for (let i = 0; i < localStorage.length; i++) {
@@ -89,7 +92,8 @@ const JoinGroup = () => {
       if (key && key.startsWith('expense_tracker_groups_')) {
         try {
           const groupsData = localStorage.getItem(key)
-          console.log('Checking key:', key, 'with data:', groupsData)
+          console.log(`Checking storage key: ${key}`)
+          console.log('Raw data:', groupsData)
           
           if (groupsData) {
             const groups = JSON.parse(groupsData)
@@ -102,26 +106,28 @@ const JoinGroup = () => {
             if (group) {
               foundGroup = group
               groupOwner = key.replace('expense_tracker_groups_', '')
-              console.log('Found matching group:', group, 'owned by:', groupOwner)
+              console.log('Found matching group:', group)
+              console.log('Group owner:', groupOwner)
               break
             }
           }
         } catch (error) {
-          console.error('Error parsing groups data for key', key, ':', error)
+          console.error(`Error checking ${key}:`, error)
         }
       }
     }
 
-    // Debug: Log what we found
-    console.log('Search results - Found group:', foundGroup)
-    console.log('Search results - Group owner:', groupOwner)
+    console.log('Search complete')
+    console.log('Found group:', foundGroup)
+    console.log('Group owner:', groupOwner)
+    console.groupEnd()
 
     if (!foundGroup || !groupOwner) {
       toast({
         title: 'Group not found',
-        description: 'No group found with this ID. Please check the ID and try again.',
+        description: 'No group found with this ID. Please check the ID and try again. Make sure you\'re using the exact ID that was shared with you.',
         status: 'error',
-        duration: 5000,
+        duration: 8000,
         isClosable: true,
       })
       return
