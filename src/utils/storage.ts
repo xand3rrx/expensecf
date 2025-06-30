@@ -6,6 +6,15 @@ const STORAGE_KEYS = {
   getCurrentUserKey: () => 'current_user'
 }
 
+// Initialize storage on app start
+export const initializeStorage = () => {
+  const groupsStr = localStorage.getItem(STORAGE_KEYS.SHARED_GROUPS)
+  if (!groupsStr || groupsStr === 'null') {
+    localStorage.setItem(STORAGE_KEYS.SHARED_GROUPS, JSON.stringify([]))
+    console.log('Initialized groups storage with empty array')
+  }
+}
+
 export const saveUser = (user: User) => {
   localStorage.setItem(STORAGE_KEYS.getUserKey(user.username), JSON.stringify(user))
   console.log(`Saved user data for ${user.username}:`, user)
@@ -19,7 +28,19 @@ export const getUser = (username: string): User | null => {
 
 export const saveGroup = (group: CoupleGroup) => {
   const existingGroupsStr = localStorage.getItem(STORAGE_KEYS.SHARED_GROUPS)
-  const existingGroups: CoupleGroup[] = existingGroupsStr ? JSON.parse(existingGroupsStr) : []
+  let existingGroups: CoupleGroup[] = []
+  
+  if (existingGroupsStr && existingGroupsStr !== 'null') {
+    try {
+      existingGroups = JSON.parse(existingGroupsStr)
+      if (!Array.isArray(existingGroups)) {
+        existingGroups = []
+      }
+    } catch (error) {
+      console.error('Error parsing existing groups:', error)
+      existingGroups = []
+    }
+  }
   
   const existingGroupIndex = existingGroups.findIndex(g => g.id === group.id)
   
@@ -35,9 +56,27 @@ export const saveGroup = (group: CoupleGroup) => {
 }
 
 export const getGroups = (): CoupleGroup[] => {
-  const groups = localStorage.getItem(STORAGE_KEYS.SHARED_GROUPS)
-  console.log('Retrieved all groups:', groups)
-  return groups ? JSON.parse(groups) : []
+  const groupsStr = localStorage.getItem(STORAGE_KEYS.SHARED_GROUPS)
+  console.log('Raw groups data:', groupsStr)
+  
+  if (!groupsStr || groupsStr === 'null') {
+    console.log('No groups found, returning empty array')
+    return []
+  }
+  
+  try {
+    const groups = JSON.parse(groupsStr)
+    if (Array.isArray(groups)) {
+      console.log('Retrieved groups:', groups)
+      return groups
+    } else {
+      console.log('Groups data is not an array, returning empty array')
+      return []
+    }
+  } catch (error) {
+    console.error('Error parsing groups:', error)
+    return []
+  }
 }
 
 export const getUserGroups = (username: string): CoupleGroup[] => {
@@ -77,7 +116,11 @@ export const debugStorage = () => {
       console.log(`${key}:`, value)
       if (key === STORAGE_KEYS.SHARED_GROUPS) {
         try {
-          console.log(`Parsed groups:`, JSON.parse(value || '[]'))
+          if (value && value !== 'null') {
+            console.log(`Parsed groups:`, JSON.parse(value))
+          } else {
+            console.log('Groups storage is null or empty')
+          }
         } catch (e) {
           console.error(`Error parsing groups:`, e)
         }

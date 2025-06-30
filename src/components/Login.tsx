@@ -12,45 +12,60 @@ import {
   useToast,
 } from '@chakra-ui/react'
 import type { User } from '../types'
-import { saveUser, getUser } from '../utils/storage'
+import { saveUser, getUser } from '../utils/cloudflareStorage'
 
 const Login = () => {
   const [username, setUsername] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
   const toast = useToast()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsLoading(true)
     
-    const trimmedUsername = username.trim()
-    if (trimmedUsername.length < 3) {
+    try {
+      const trimmedUsername = username.trim()
+      if (trimmedUsername.length < 3) {
+        toast({
+          title: 'Invalid username',
+          description: 'Username must be at least 3 characters long',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        })
+        return
+      }
+
+      // Check if user already exists
+      const existingUser = await getUser(trimmedUsername)
+      if (existingUser) {
+        // If user exists, just log them in
+        await saveUser(existingUser)
+        localStorage.setItem('current_user', JSON.stringify(existingUser))
+      } else {
+        // Create new user
+        const user: User = {
+          username: trimmedUsername,
+          groupId: null,
+        }
+        await saveUser(user)
+        localStorage.setItem('current_user', JSON.stringify(user))
+      }
+      
+      navigate('/dashboard')
+    } catch (error) {
+      console.error('Error during login:', error)
       toast({
-        title: 'Invalid username',
-        description: 'Username must be at least 3 characters long',
+        title: 'Error',
+        description: 'Failed to log in. Please try again.',
         status: 'error',
-        duration: 3000,
+        duration: 5000,
         isClosable: true,
       })
-      return
+    } finally {
+      setIsLoading(false)
     }
-
-    // Check if user already exists
-    const existingUser = getUser(trimmedUsername)
-    if (existingUser) {
-      // If user exists, just log them in
-      saveUser(existingUser)
-      localStorage.setItem('current_user', JSON.stringify(existingUser))
-    } else {
-      // Create new user
-      const user: User = {
-        username: trimmedUsername,
-        groupId: null,
-      }
-      saveUser(user)
-      localStorage.setItem('current_user', JSON.stringify(user))
-    }
-    
-    navigate('/dashboard')
   }
 
   return (
@@ -67,9 +82,16 @@ const Login = () => {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter your username"
+                disabled={isLoading}
               />
             </FormControl>
-            <Button type="submit" colorScheme="blue" width="full">
+            <Button 
+              type="submit" 
+              colorScheme="blue" 
+              width="full"
+              isLoading={isLoading}
+              loadingText="Logging in..."
+            >
               Continue
             </Button>
           </VStack>

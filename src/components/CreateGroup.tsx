@@ -12,89 +12,97 @@ import {
 } from '@chakra-ui/react'
 import { v4 as uuidv4 } from 'uuid'
 import type { User, CoupleGroup } from '../types'
-import { getUser, saveUser, debugStorage, saveGroup } from '../utils/storage'
+import { saveUser, saveGroup, debugStorage } from '../utils/cloudflareStorage'
 
 const CreateGroup = () => {
   const [groupName, setGroupName] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
   const toast = useToast()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsLoading(true)
     
-    // Get current username
-    const storedUser = localStorage.getItem('current_user')
-    const username = storedUser ? JSON.parse(storedUser).username : null
+    try {
+      // Get current username
+      const storedUser = localStorage.getItem('current_user')
+      const username = storedUser ? JSON.parse(storedUser).username : null
 
-    if (!username) {
+      if (!username) {
+        toast({
+          title: 'Error',
+          description: 'No username found. Please log in again.',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        })
+        navigate('/')
+        return
+      }
+
+      if (groupName.trim().length < 3) {
+        toast({
+          title: 'Invalid group name',
+          description: 'Group name must be at least 3 characters long',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        })
+        return
+      }
+
+      const newGroup: CoupleGroup = {
+        id: uuidv4(),
+        name: groupName.trim(),
+        members: [username],
+        expenses: []
+      }
+
+      // Update user with group ID
+      const updatedUser: User = {
+        username,
+        groupId: newGroup.id
+      }
+
+      // Save the group and user
+      const [groupSaved, userSaved] = await Promise.all([
+        saveGroup(newGroup),
+        saveUser(updatedUser)
+      ])
+
+      if (!groupSaved || !userSaved) {
+        throw new Error('Failed to save group or user data')
+      }
+
+      // Update local storage for current user
+      localStorage.setItem('current_user', JSON.stringify(updatedUser))
+
+      // Debug: Log the current storage state
+      console.log('Created new group:', newGroup)
+      await debugStorage()
+
+      toast({
+        title: 'Group Created Successfully',
+        description: `Your group ID is: ${newGroup.id}\nShare this ID with your partner to join the group.`,
+        status: 'success',
+        duration: 10000,
+        isClosable: true,
+      })
+
+      navigate('/dashboard')
+    } catch (error) {
+      console.error('Error creating group:', error)
       toast({
         title: 'Error',
-        description: 'No username found. Please log in again.',
+        description: 'Failed to create group. Please try again.',
         status: 'error',
         duration: 5000,
         isClosable: true,
       })
-      navigate('/')
-      return
+    } finally {
+      setIsLoading(false)
     }
-
-    const user = getUser(username)
-    if (!user) {
-      toast({
-        title: 'Error',
-        description: 'User not found. Please log in again.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      })
-      navigate('/')
-      return
-    }
-
-    if (groupName.trim().length < 3) {
-      toast({
-        title: 'Invalid group name',
-        description: 'Group name must be at least 3 characters long',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      })
-      return
-    }
-
-    const newGroup: CoupleGroup = {
-      id: uuidv4(),
-      name: groupName.trim(),
-      members: [user.username],
-      expenses: []
-    }
-
-    // Update user with group ID
-    const updatedUser: User = {
-      ...user,
-      groupId: newGroup.id
-    }
-
-    // Save the group
-    saveGroup(newGroup)
-
-    // Save user data
-    saveUser(updatedUser)
-    localStorage.setItem('current_user', JSON.stringify(updatedUser))
-
-    // Debug: Log the current storage state
-    console.log('Created new group:', newGroup)
-    debugStorage()
-
-    toast({
-      title: 'Group Created Successfully',
-      description: `Your group ID is: ${newGroup.id}\nShare this ID with your partner to join the group.`,
-      status: 'success',
-      duration: 10000,
-      isClosable: true,
-    })
-
-    navigate('/dashboard')
   }
 
   return (
@@ -110,9 +118,16 @@ const CreateGroup = () => {
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
                 placeholder="Enter group name"
+                disabled={isLoading}
               />
             </FormControl>
-            <Button type="submit" colorScheme="blue" width="full">
+            <Button 
+              type="submit" 
+              colorScheme="blue" 
+              width="full"
+              isLoading={isLoading}
+              loadingText="Creating Group..."
+            >
               Create Group
             </Button>
           </VStack>

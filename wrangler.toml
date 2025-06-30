@@ -1,0 +1,15 @@
+name = "expense-tracker"
+main = "functions/api/kv.ts"
+compatibility_date = "2024-01-01"
+
+[env.production]
+name = "expense-tracker-prod"
+
+[env.staging]
+name = "expense-tracker-staging"
+
+# KV namespace binding
+[[kv_namespaces]]
+binding = "EXPENSE_TRACKER_KV"
+id = "748d6950c6964cd9a724db96f9a104f5"
+preview_id = "748d6950c6964cd9a724db96f9a104f5" 

@@ -12,148 +12,169 @@ import {
   Text,
 } from '@chakra-ui/react'
 import type { User, CoupleGroup } from '../types'
-import { getUser, saveUser, debugStorage, getGroupById, saveGroup } from '../utils/storage'
+import { getUser, saveUser, debugStorage, getGroupById, saveGroup } from '../utils/cloudflareStorage'
 
 const JoinGroup = () => {
   const [groupId, setGroupId] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
   const toast = useToast()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsLoading(true)
     
-    // Get current username
-    const storedUser = localStorage.getItem('current_user')
-    const username = storedUser ? JSON.parse(storedUser).username : null
+    try {
+      // Get current username
+      const storedUser = localStorage.getItem('current_user')
+      const username = storedUser ? JSON.parse(storedUser).username : null
 
-    if (!username) {
+      if (!username) {
+        toast({
+          title: 'Error',
+          description: 'No username found. Please log in again.',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        })
+        navigate('/')
+        return
+      }
+
+      const user = await getUser(username)
+      if (!user) {
+        toast({
+          title: 'Error',
+          description: 'User not found. Please log in again.',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        })
+        navigate('/')
+        return
+      }
+
+      // Check if user is already in a group
+      if (user.groupId) {
+        toast({
+          title: 'Already in a group',
+          description: 'You are already a member of a group. You cannot join another group.',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        })
+        navigate('/dashboard')
+        return
+      }
+
+      const trimmedGroupId = groupId.trim()
+      if (!trimmedGroupId) {
+        toast({
+          title: 'Invalid group ID',
+          description: 'Please enter a group ID',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        })
+        return
+      }
+
+      // Debug current state
+      console.group('Join Group Debug')
+      console.log('Current user:', username)
+      console.log('Attempting to join group:', trimmedGroupId)
+      await debugStorage()
+
+      // Find the group
+      const foundGroup = await getGroupById(trimmedGroupId)
+
+      console.log('Search complete')
+      console.log('Found group:', foundGroup)
+      console.groupEnd()
+
+      if (!foundGroup) {
+        toast({
+          title: 'Group not found',
+          description: 'No group found with this ID. Please check the ID and try again. Make sure you\'re using the exact ID that was shared with you.',
+          status: 'error',
+          duration: 8000,
+          isClosable: true,
+        })
+        return
+      }
+
+      if (foundGroup.members.includes(user.username)) {
+        toast({
+          title: 'Already a member',
+          description: 'You are already a member of this group',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        })
+        return
+      }
+
+      if (foundGroup.members.length >= 2) {
+        toast({
+          title: 'Group is full',
+          description: 'This group already has two members',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        })
+        return
+      }
+
+      // Update group with new member
+      const updatedGroup: CoupleGroup = {
+        ...foundGroup,
+        members: [...foundGroup.members, user.username]
+      }
+
+      // Update user with group ID
+      const updatedUser: User = {
+        ...user,
+        groupId: foundGroup.id
+      }
+
+      // Save the updated group and user
+      const [groupSaved, userSaved] = await Promise.all([
+        saveGroup(updatedGroup),
+        saveUser(updatedUser)
+      ])
+
+      if (!groupSaved || !userSaved) {
+        throw new Error('Failed to save group or user data')
+      }
+
+      // Update local storage for current user
+      localStorage.setItem('current_user', JSON.stringify(updatedUser))
+
+      // Debug: Log final state
+      console.log('Updated group:', updatedGroup)
+      await debugStorage()
+      
       toast({
-        title: 'Error',
-        description: 'No username found. Please log in again.',
-        status: 'error',
-        duration: 5000,
+        title: 'Success',
+        description: 'You have successfully joined the group!',
+        status: 'success',
+        duration: 3000,
         isClosable: true,
       })
-      navigate('/')
-      return
-    }
 
-    const user = getUser(username)
-    if (!user) {
-      toast({
-        title: 'Error',
-        description: 'User not found. Please log in again.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      })
-      navigate('/')
-      return
-    }
-
-    // Check if user is already in a group
-    if (user.groupId) {
-      toast({
-        title: 'Already in a group',
-        description: 'You are already a member of a group. You cannot join another group.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      })
       navigate('/dashboard')
-      return
-    }
-
-    const trimmedGroupId = groupId.trim()
-    if (!trimmedGroupId) {
+    } catch (error) {
+      console.error('Error joining group:', error)
       toast({
-        title: 'Invalid group ID',
-        description: 'Please enter a group ID',
+        title: 'Error',
+        description: 'Failed to join group. Please try again.',
         status: 'error',
-        duration: 3000,
+        duration: 5000,
         isClosable: true,
       })
-      return
+    } finally {
+      setIsLoading(false)
     }
-
-    // Debug current state
-    console.group('Join Group Debug')
-    console.log('Current user:', username)
-    console.log('Attempting to join group:', trimmedGroupId)
-    debugStorage()
-
-    // Find the group
-    const foundGroup = getGroupById(trimmedGroupId)
-
-    console.log('Search complete')
-    console.log('Found group:', foundGroup)
-    console.groupEnd()
-
-    if (!foundGroup) {
-      toast({
-        title: 'Group not found',
-        description: 'No group found with this ID. Please check the ID and try again. Make sure you\'re using the exact ID that was shared with you.',
-        status: 'error',
-        duration: 8000,
-        isClosable: true,
-      })
-      return
-    }
-
-    if (foundGroup.members.includes(user.username)) {
-      toast({
-        title: 'Already a member',
-        description: 'You are already a member of this group',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      })
-      return
-    }
-
-    if (foundGroup.members.length >= 2) {
-      toast({
-        title: 'Group is full',
-        description: 'This group already has two members',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      })
-      return
-    }
-
-    // Update group with new member
-    const updatedGroup: CoupleGroup = {
-      ...foundGroup,
-      members: [...foundGroup.members, user.username]
-    }
-
-    // Update user with group ID
-    const updatedUser: User = {
-      ...user,
-      groupId: foundGroup.id
-    }
-
-    // Save the updated group
-    saveGroup(updatedGroup)
-
-    // Save user data
-    saveUser(updatedUser)
-    localStorage.setItem('current_user', JSON.stringify(updatedUser))
-
-    // Debug: Log final state
-    console.log('Updated group:', updatedGroup)
-    debugStorage()
-    
-    toast({
-      title: 'Success',
-      description: 'You have successfully joined the group!',
-      status: 'success',
-      duration: 3000,
-      isClosable: true,
-    })
-
-    navigate('/dashboard')
   }
 
   return (
@@ -173,9 +194,16 @@ const JoinGroup = () => {
                 value={groupId}
                 onChange={(e) => setGroupId(e.target.value)}
                 placeholder="Enter group ID"
+                disabled={isLoading}
               />
             </FormControl>
-            <Button type="submit" colorScheme="blue" width="full">
+            <Button 
+              type="submit" 
+              colorScheme="blue" 
+              width="full"
+              isLoading={isLoading}
+              loadingText="Joining Group..."
+            >
               Join Group
             </Button>
           </VStack>

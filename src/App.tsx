@@ -1,11 +1,17 @@
 import { ChakraProvider, Container } from '@chakra-ui/react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { useEffect } from 'react'
 import Login from './components/Login'
 import Dashboard from './components/Dashboard'
 import CreateGroup from './components/CreateGroup'
 import JoinGroup from './components/JoinGroup'
+import { initializeStorage } from './utils/storage'
 
 function App() {
+  useEffect(() => {
+    initializeStorage()
+  }, [])
+
   return (
     <ChakraProvider>
       <Container maxW="container.lg" py={8}>
