@@ -12,7 +12,7 @@ import {
 } from '@chakra-ui/react'
 import { v4 as uuidv4 } from 'uuid'
 import type { User, CoupleGroup } from '../types'
-import { getUser, saveUser, debugStorage } from '../utils/storage'
+import { getUser, saveUser, debugStorage, saveGroup } from '../utils/storage'
 
 const CreateGroup = () => {
   const [groupName, setGroupName] = useState('')
@@ -75,9 +75,8 @@ const CreateGroup = () => {
       groupId: newGroup.id
     }
 
-    // Save the group directly to localStorage
-    const storageKey = `expense_tracker_groups_${username}`
-    localStorage.setItem(storageKey, JSON.stringify([newGroup]))
+    // Save the group
+    saveGroup(newGroup)
 
     // Save user data
     saveUser(updatedUser)
@@ -85,7 +84,6 @@ const CreateGroup = () => {
 
     // Debug: Log the current storage state
     console.log('Created new group:', newGroup)
-    console.log('Storage key used:', storageKey)
     debugStorage()
 
     toast({

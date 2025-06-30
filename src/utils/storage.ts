@@ -1,86 +1,67 @@
 import type { CoupleGroup, User } from '../types'
 
-const getStorageKeyForUser = (username: string) => ({
-  USER: `expense_tracker_user_${username}`,
-  GROUPS: `expense_tracker_groups_${username}`
-})
+const STORAGE_KEYS = {
+  SHARED_GROUPS: 'expense_tracker_all_groups',
+  getUserKey: (username: string) => `expense_tracker_user_${username}`,
+  getCurrentUserKey: () => 'current_user'
+}
 
 export const saveUser = (user: User) => {
-  const STORAGE_KEYS = getStorageKeyForUser(user.username)
-  localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user))
+  localStorage.setItem(STORAGE_KEYS.getUserKey(user.username), JSON.stringify(user))
   console.log(`Saved user data for ${user.username}:`, user)
 }
 
 export const getUser = (username: string): User | null => {
-  const STORAGE_KEYS = getStorageKeyForUser(username)
-  const user = localStorage.getItem(STORAGE_KEYS.USER)
+  const user = localStorage.getItem(STORAGE_KEYS.getUserKey(username))
   console.log(`Retrieved user data for ${username}:`, user)
   return user ? JSON.parse(user) : null
 }
 
-export const saveGroup = (group: CoupleGroup, username: string) => {
-  const STORAGE_KEYS = getStorageKeyForUser(username)
-  const groups = getGroups(username)
-  const existingGroupIndex = groups.findIndex(g => g.id === group.id)
+export const saveGroup = (group: CoupleGroup) => {
+  const existingGroupsStr = localStorage.getItem(STORAGE_KEYS.SHARED_GROUPS)
+  const existingGroups: CoupleGroup[] = existingGroupsStr ? JSON.parse(existingGroupsStr) : []
+  
+  const existingGroupIndex = existingGroups.findIndex(g => g.id === group.id)
   
   if (existingGroupIndex >= 0) {
-    groups[existingGroupIndex] = group
+    existingGroups[existingGroupIndex] = group
   } else {
-    groups.push(group)
+    existingGroups.push(group)
   }
   
-  localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(groups))
-  console.log(`Saved group for ${username}:`, groups)
+  localStorage.setItem(STORAGE_KEYS.SHARED_GROUPS, JSON.stringify(existingGroups))
+  console.log('Saved group:', group)
+  console.log('All groups:', existingGroups)
 }
 
-export const getGroups = (username: string): CoupleGroup[] => {
-  const STORAGE_KEYS = getStorageKeyForUser(username)
-  const groups = localStorage.getItem(STORAGE_KEYS.GROUPS)
-  console.log(`Retrieved groups for ${username}:`, groups)
+export const getGroups = (): CoupleGroup[] => {
+  const groups = localStorage.getItem(STORAGE_KEYS.SHARED_GROUPS)
+  console.log('Retrieved all groups:', groups)
   return groups ? JSON.parse(groups) : []
 }
 
-export const getGroupById = (id: string, username: string): CoupleGroup | null => {
-  console.log(`Searching for group ${id} in ${username}'s storage`)
-  const groups = getGroups(username)
+export const getUserGroups = (username: string): CoupleGroup[] => {
+  const allGroups = getGroups()
+  const userGroups = allGroups.filter(group => group.members.includes(username))
+  console.log(`Retrieved groups for ${username}:`, userGroups)
+  return userGroups
+}
+
+export const getGroupById = (id: string): CoupleGroup | null => {
+  console.log(`Searching for group ${id}`)
+  const groups = getGroups()
   const group = groups.find(g => g.id === id)
   console.log(`Found group:`, group)
   return group || null
 }
 
 export const clearStorage = (username: string) => {
-  const STORAGE_KEYS = getStorageKeyForUser(username)
-  localStorage.removeItem(STORAGE_KEYS.USER)
-  localStorage.removeItem(STORAGE_KEYS.GROUPS)
+  localStorage.removeItem(STORAGE_KEYS.getUserKey(username))
   console.log(`Cleared storage for ${username}`)
 }
 
 export const getAllGroups = (): CoupleGroup[] => {
-  const allGroups: CoupleGroup[] = []
-  console.log('Searching all localStorage for groups...')
-  
-  // Get all keys from localStorage
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i)
-    if (key && key.startsWith('expense_tracker_groups_')) {
-      try {
-        const groupsData = localStorage.getItem(key)
-        console.log(`Found groups key: ${key}`, groupsData)
-        if (groupsData) {
-          const groups = JSON.parse(groupsData)
-          if (Array.isArray(groups)) {
-            allGroups.push(...groups)
-            console.log(`Added groups from ${key}:`, groups)
-          }
-        }
-      } catch (error) {
-        console.error(`Error parsing groups data for ${key}:`, error)
-      }
-    }
-  }
-  
-  console.log('All available groups:', allGroups)
-  return allGroups
+  return getGroups()
 }
 
 export const debugStorage = () => {
@@ -94,11 +75,11 @@ export const debugStorage = () => {
       allKeys.push(key)
       const value = localStorage.getItem(key)
       console.log(`${key}:`, value)
-      if (key.includes('groups')) {
+      if (key === STORAGE_KEYS.SHARED_GROUPS) {
         try {
-          console.log(`Parsed ${key}:`, JSON.parse(value || '[]'))
+          console.log(`Parsed groups:`, JSON.parse(value || '[]'))
         } catch (e) {
-          console.error(`Error parsing ${key}:`, e)
+          console.error(`Error parsing groups:`, e)
         }
       }
     }

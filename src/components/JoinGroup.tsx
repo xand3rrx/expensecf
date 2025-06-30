@@ -12,7 +12,7 @@ import {
   Text,
 } from '@chakra-ui/react'
 import type { User, CoupleGroup } from '../types'
-import { getUser, saveUser, debugStorage } from '../utils/storage'
+import { getUser, saveUser, debugStorage, getGroupById, saveGroup } from '../utils/storage'
 
 const JoinGroup = () => {
   const [groupId, setGroupId] = useState('')
@@ -82,47 +82,14 @@ const JoinGroup = () => {
     console.log('Attempting to join group:', trimmedGroupId)
     debugStorage()
 
-    // Search for the group in all users' storage
-    let foundGroup: CoupleGroup | null = null
-    let groupOwner: string | null = null
-
-    // Search through localStorage for the group
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key && key.startsWith('expense_tracker_groups_')) {
-        try {
-          const groupsData = localStorage.getItem(key)
-          console.log(`Checking storage key: ${key}`)
-          console.log('Raw data:', groupsData)
-          
-          if (groupsData) {
-            const groups = JSON.parse(groupsData)
-            console.log('Parsed groups:', groups)
-            
-            // Handle both array and single group cases
-            const groupsArray = Array.isArray(groups) ? groups : [groups]
-            const group = groupsArray.find(g => g.id === trimmedGroupId)
-            
-            if (group) {
-              foundGroup = group
-              groupOwner = key.replace('expense_tracker_groups_', '')
-              console.log('Found matching group:', group)
-              console.log('Group owner:', groupOwner)
-              break
-            }
-          }
-        } catch (error) {
-          console.error(`Error checking ${key}:`, error)
-        }
-      }
-    }
+    // Find the group
+    const foundGroup = getGroupById(trimmedGroupId)
 
     console.log('Search complete')
     console.log('Found group:', foundGroup)
-    console.log('Group owner:', groupOwner)
     console.groupEnd()
 
-    if (!foundGroup || !groupOwner) {
+    if (!foundGroup) {
       toast({
         title: 'Group not found',
         description: 'No group found with this ID. Please check the ID and try again. Make sure you\'re using the exact ID that was shared with you.',
@@ -167,9 +134,8 @@ const JoinGroup = () => {
       groupId: foundGroup.id
     }
 
-    // Save the updated group for both users
-    localStorage.setItem(`expense_tracker_groups_${groupOwner}`, JSON.stringify([updatedGroup]))
-    localStorage.setItem(`expense_tracker_groups_${username}`, JSON.stringify([updatedGroup]))
+    // Save the updated group
+    saveGroup(updatedGroup)
 
     // Save user data
     saveUser(updatedUser)
