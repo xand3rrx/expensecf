@@ -13,6 +13,7 @@ import {
   Radio,
   Stack,
   Heading,
+  Box,
 } from '@chakra-ui/react'
 import { v4 as uuidv4 } from 'uuid'
 import type { Expense, CoupleGroup } from '../types'
@@ -143,56 +144,75 @@ const AddExpense: React.FC<AddExpenseProps> = ({ onExpenseAdded }) => {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <VStack spacing={4}>
-        <Heading size="md">Add Transaction</Heading>
+    <Box className="card" mt={4}>
+      <form onSubmit={handleSubmit}>
+        <VStack spacing={6}>
+          <Heading size="md">Add Transaction</Heading>
 
-        <FormControl isRequired>
-          <FormLabel>Transaction Type</FormLabel>
-          <RadioGroup value={type} onChange={handleTypeChange}>
-            <Stack direction="row">
-              <Radio value="expense">Expense</Radio>
-              <Radio value="addition">Addition</Radio>
-            </Stack>
-          </RadioGroup>
-        </FormControl>
+          <FormControl isRequired>
+            <FormLabel color="var(--muted-foreground)">Transaction Type</FormLabel>
+            <RadioGroup value={type} onChange={handleTypeChange}>
+              <Stack direction="row" spacing={4}>
+                <Radio
+                  value="expense"
+                  colorScheme="red"
+                  borderColor="var(--border)"
+                >
+                  Expense
+                </Radio>
+                <Radio
+                  value="addition"
+                  colorScheme="green"
+                  borderColor="var(--border)"
+                >
+                  Addition
+                </Radio>
+              </Stack>
+            </RadioGroup>
+          </FormControl>
 
-        <FormControl isRequired>
-          <FormLabel>Description</FormLabel>
-          <Input
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder={type === 'expense' ? "What did you spend on?" : "What's the source of this addition?"}
-          />
-        </FormControl>
+          <FormControl isRequired>
+            <FormLabel color="var(--muted-foreground)">Description</FormLabel>
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={type === 'expense' ? "What did you spend on?" : "What's the source of this addition?"}
+              className="input"
+            />
+          </FormControl>
 
-        <FormControl isRequired>
-          <FormLabel>Amount</FormLabel>
-          <NumberInput min={0} value={amount} onChange={(value) => setAmount(value)}>
-            <NumberInputField placeholder="Enter amount" />
-          </NumberInput>
-        </FormControl>
+          <FormControl isRequired>
+            <FormLabel color="var(--muted-foreground)">Amount</FormLabel>
+            <NumberInput min={0} value={amount} onChange={(value) => setAmount(value)}>
+              <NumberInputField placeholder="Enter amount" className="input" />
+            </NumberInput>
+          </FormControl>
 
-        <FormControl>
-          <FormLabel>Category</FormLabel>
-          <Select value={category} onChange={(e) => setCategory(e.target.value)}>
-            {(type === 'expense' ? EXPENSE_CATEGORIES : ADDITION_CATEGORIES).map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </Select>
-        </FormControl>
+          <FormControl>
+            <FormLabel color="var(--muted-foreground)">Category</FormLabel>
+            <Select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="input"
+            >
+              {(type === 'expense' ? EXPENSE_CATEGORIES : ADDITION_CATEGORIES).map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </Select>
+          </FormControl>
 
-        <Button 
-          type="submit" 
-          colorScheme={type === 'expense' ? "red" : "green"} 
-          width="full"
-          isLoading={isSubmitting}
-          loadingText="Adding..."
-        >
-          Add {type === 'expense' ? 'Expense' : 'Addition'}
-        </Button>
-      </VStack>
-    </form>
+          <Button
+            type="submit"
+            width="full"
+            isLoading={isSubmitting}
+            loadingText="Adding..."
+            className={`button ${type === 'expense' ? 'button-destructive' : 'button-primary'}`}
+          >
+            Add {type === 'expense' ? 'Expense' : 'Addition'}
+          </Button>
+        </VStack>
+      </form>
+    </Box>
   )
 }
 

@@ -147,8 +147,8 @@ const Dashboard = () => {
 
   if (isLoading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
-        <Spinner size="xl" />
+      <Box display="flex" justifyContent="center" alignItems="center" height="calc(100vh - 64px)">
+        <Spinner size="xl" color="var(--primary)" />
       </Box>
     )
   }
@@ -168,14 +168,14 @@ const Dashboard = () => {
   }, { expenses: 0, additions: 0 }) || { expenses: 0, additions: 0 }
 
   return (
-    <Box>
+    <Box pb="64px">
       <AlertDialog
         isOpen={isOpen}
         leastDestructiveRef={cancelRef}
         onClose={onClose}
       >
         <AlertDialogOverlay>
-          <AlertDialogContent>
+          <AlertDialogContent bg="var(--card)" borderColor="var(--border)">
             <AlertDialogHeader fontSize="lg" fontWeight="bold">
               Leave Group
             </AlertDialogHeader>
@@ -185,7 +185,7 @@ const Dashboard = () => {
             </AlertDialogBody>
 
             <AlertDialogFooter>
-              <Button ref={cancelRef} onClick={onClose}>
+              <Button ref={cancelRef} onClick={onClose} variant="ghost">
                 Cancel
               </Button>
               <Button colorScheme="red" onClick={handleLeaveGroup} ml={3} isLoading={isLoading}>
@@ -197,59 +197,78 @@ const Dashboard = () => {
       </AlertDialog>
 
       <VStack spacing={6} align="stretch">
-        <Heading size="lg">Welcome, {user.username}!</Heading>
+        <Heading size="lg" mb={2}>Welcome, {user.username}!</Heading>
 
         {!group ? (
-          <VStack spacing={4} p={4} bg="white" borderRadius="lg" shadow="sm">
-            <Text>You're not part of any group yet.</Text>
-            <HStack spacing={4}>
-              <Button colorScheme="blue" onClick={handleCreateGroup}>
-                Create Group
-              </Button>
-              <Button colorScheme="green" onClick={handleJoinGroup}>
-                Join Group
-              </Button>
-            </HStack>
-          </VStack>
+          <Box className="card">
+            <VStack spacing={4}>
+              <Text>You're not part of any group yet.</Text>
+              <HStack spacing={4}>
+                <Button
+                  className="button button-primary"
+                  onClick={handleCreateGroup}
+                >
+                  Create Group
+                </Button>
+                <Button
+                  className="button button-secondary"
+                  onClick={handleJoinGroup}
+                >
+                  Join Group
+                </Button>
+              </HStack>
+            </VStack>
+          </Box>
         ) : (
           <VStack spacing={4}>
-            <Box w="full" p={4} bg="white" borderRadius="lg" shadow="sm">
+            <Box className="card">
               <HStack justify="space-between" mb={2}>
                 <Heading size="md">{group.name}</Heading>
-                <Button size="sm" colorScheme="red" variant="outline" onClick={onOpen}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  colorScheme="red"
+                  onClick={onOpen}
+                >
                   Leave
                 </Button>
               </HStack>
-              <Text fontSize="sm" color="gray.600">
+              <Text fontSize="sm" color="var(--muted-foreground)">
                 Members: {group.members.join(', ')}
               </Text>
             </Box>
 
             <SimpleGrid columns={2} spacing={4} w="full">
-              <Box p={4} bg="white" borderRadius="lg" shadow="sm">
-                <Text fontSize="sm" color="gray.600">Total Expenses</Text>
-                <Text fontSize="xl" fontWeight="bold" color="red.500">
+              <Box className="card">
+                <Text fontSize="sm" color="var(--muted-foreground)">Total Expenses</Text>
+                <Text fontSize="xl" fontWeight="bold" color="var(--destructive)">
                   ${totals.expenses.toFixed(2)}
                 </Text>
               </Box>
-              <Box p={4} bg="white" borderRadius="lg" shadow="sm">
-                <Text fontSize="sm" color="gray.600">Total Additions</Text>
-                <Text fontSize="xl" fontWeight="bold" color="green.500">
+              <Box className="card">
+                <Text fontSize="sm" color="var(--muted-foreground)">Total Additions</Text>
+                <Text fontSize="xl" fontWeight="bold" color="#22c55e">
                   ${totals.additions.toFixed(2)}
                 </Text>
               </Box>
             </SimpleGrid>
 
-            <Box w="full" p={4} bg="white" borderRadius="lg" shadow="sm">
-              <Text fontSize="sm" mb={2}>Group ID (Share with partner)</Text>
+            <Box className="card">
+              <Text fontSize="sm" mb={2} color="var(--muted-foreground)">Group ID (Share with partner)</Text>
               <InputGroup size="sm">
                 <Input
                   value={group.id}
                   isReadOnly
                   pr="4.5rem"
+                  className="input"
                 />
                 <InputRightElement width="4.5rem">
-                  <Button h="1.75rem" size="sm" onClick={onCopy}>
+                  <Button
+                    h="1.75rem"
+                    size="sm"
+                    onClick={onCopy}
+                    className="button button-secondary"
+                  >
                     {hasCopied ? 'Copied!' : 'Copy'}
                   </Button>
                 </InputRightElement>
@@ -257,25 +276,30 @@ const Dashboard = () => {
             </Box>
 
             {group.expenses.length > 0 && (
-              <Box w="full" p={4} bg="white" borderRadius="lg" shadow="sm">
+              <Box className="card">
                 <Heading size="sm" mb={3}>Recent Transactions</Heading>
                 <VStack spacing={3} align="stretch">
                   {[...group.expenses]
                     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                     .slice(0, 5)
                     .map(expense => (
-                      <HStack key={expense.id} justify="space-between">
+                      <HStack key={expense.id} justify="space-between" p={2} className="card">
                         <VStack align="start" spacing={0}>
                           <Text fontSize="sm">{expense.description}</Text>
-                          <Text fontSize="xs" color="gray.500">
+                          <Text fontSize="xs" color="var(--muted-foreground)">
                             by {expense.paidBy} • {new Date(expense.date).toLocaleDateString()}
                           </Text>
                         </VStack>
                         <HStack spacing={2}>
-                          <Badge colorScheme={expense.type === 'expense' ? 'red' : 'green'}>
+                          <Badge
+                            className={`badge badge-${expense.type}`}
+                          >
                             {expense.type}
                           </Badge>
-                          <Text fontWeight="bold" color={expense.type === 'expense' ? 'red.500' : 'green.500'}>
+                          <Text
+                            fontWeight="bold"
+                            color={expense.type === 'expense' ? 'var(--destructive)' : '#22c55e'}
+                          >
                             ${expense.amount.toFixed(2)}
                           </Text>
                         </HStack>

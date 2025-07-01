@@ -1,57 +1,80 @@
-import { Box, Flex, Icon, Text, useColorModeValue } from '@chakra-ui/react'
-import { useNavigate, useLocation } from 'react-router-dom'
-import { FaHome, FaChartBar, FaPlus } from 'react-icons/fa'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { Box, HStack, VStack, Text } from '@chakra-ui/react'
+import { RiHome5Fill, RiHome5Line } from 'react-icons/ri'
+import { IoAddCircle, IoAddCircleOutline } from 'react-icons/io5'
+import { IoStatsChartSharp, IoStatsChart } from 'react-icons/io5'
 
 const BottomNav = () => {
-  const navigate = useNavigate()
   const location = useLocation()
-  const bgColor = useColorModeValue('white', 'gray.800')
-  const activeColor = useColorModeValue('blue.500', 'blue.200')
-  const inactiveColor = useColorModeValue('gray.600', 'gray.400')
+  const navigate = useNavigate()
+  const currentPath = location.pathname
+
+  // Don't show on login page
+  if (currentPath === '/') return null
 
   const navItems = [
-    { icon: FaHome, label: 'Home', path: '/dashboard' },
-    { icon: FaPlus, label: 'Add', path: '/add-transaction' },
-    { icon: FaChartBar, label: 'Analytics', path: '/analytics' },
+    {
+      label: 'Home',
+      path: '/dashboard',
+      icon: currentPath === '/dashboard' ? RiHome5Fill : RiHome5Line,
+    },
+    {
+      label: 'Add',
+      path: '/add-expense',
+      icon: currentPath === '/add-expense' ? IoAddCircle : IoAddCircleOutline,
+    },
+    {
+      label: 'Analytics',
+      path: '/analytics',
+      icon: currentPath === '/analytics' ? IoStatsChartSharp : IoStatsChart,
+    },
   ]
 
   return (
-    <>
-      {/* Spacer to prevent content from being hidden behind the nav bar */}
-      <Box h="70px" />
-      
-      {/* Fixed bottom navigation */}
-      <Box
-        position="fixed"
-        bottom={0}
-        left={0}
-        right={0}
-        bg={bgColor}
-        boxShadow="0 -2px 10px rgba(0, 0, 0, 0.1)"
-        zIndex={1000}
+    <Box
+      position="fixed"
+      bottom={0}
+      left={0}
+      right={0}
+      height="64px"
+      bg="var(--card)"
+      borderTop="1px solid var(--border)"
+      backdropFilter="blur(10px)"
+      zIndex={1000}
+    >
+      <HStack
+        height="100%"
+        justify="space-around"
+        align="center"
+        maxW="480px"
+        margin="0 auto"
+        px={4}
       >
-        <Flex justify="space-around" align="center" h="60px">
-          {navItems.map(({ icon, label, path }) => (
-            <Flex
-              key={path}
-              direction="column"
-              align="center"
-              justify="center"
-              flex={1}
-              py={2}
+        {navItems.map((item) => {
+          const Icon = item.icon
+          const isActive = currentPath === item.path
+          return (
+            <VStack
+              key={item.path}
+              spacing={0.5}
               cursor="pointer"
-              color={location.pathname === path ? activeColor : inactiveColor}
-              onClick={() => navigate(path)}
+              onClick={() => navigate(item.path)}
+              color={isActive ? 'var(--primary)' : 'var(--muted-foreground)'}
               transition="all 0.2s"
-              _hover={{ color: activeColor }}
+              _hover={{ color: 'var(--primary)' }}
             >
-              <Icon as={icon} boxSize={5} mb={1} />
-              <Text fontSize="xs" fontWeight="medium">{label}</Text>
-            </Flex>
-          ))}
-        </Flex>
-      </Box>
-    </>
+              <Icon size={24} />
+              <Text
+                fontSize="xs"
+                fontWeight={isActive ? "600" : "400"}
+              >
+                {item.label}
+              </Text>
+            </VStack>
+          )
+        })}
+      </HStack>
+    </Box>
   )
 }
 

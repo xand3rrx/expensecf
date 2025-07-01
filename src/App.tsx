@@ -1,57 +1,88 @@
-import { ChakraProvider, Container, Box } from '@chakra-ui/react'
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
-import { useEffect } from 'react'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { ChakraProvider, extendTheme } from '@chakra-ui/react'
+import './App.css'
 import Login from './components/Login'
 import Dashboard from './components/Dashboard'
 import CreateGroup from './components/CreateGroup'
 import JoinGroup from './components/JoinGroup'
-import Analytics from './components/Analytics'
 import AddExpense from './components/AddExpense'
+import Analytics from './components/Analytics'
 import BottomNav from './components/BottomNav'
-import { initializeStorage } from './utils/storage'
 
-// Wrapper component to conditionally render BottomNav
-const AppContent = () => {
-  const location = useLocation()
-  const showBottomNav = !['/'].includes(location.pathname)
+// Extend Chakra UI theme with dark mode and custom colors
+const theme = extendTheme({
+  config: {
+    initialColorMode: 'dark',
+    useSystemColorMode: false,
+  },
+  styles: {
+    global: {
+      body: {
+        bg: 'var(--background)',
+        color: 'var(--foreground)',
+      },
+    },
+  },
+  colors: {
+    primary: {
+      50: '#f5f3ff',
+      100: '#ede9fe',
+      200: '#ddd6fe',
+      300: '#c4b5fd',
+      400: '#a78bfa',
+      500: '#8b5cf6',
+      600: '#7c3aed',
+      700: '#6d28d9',
+      800: '#5b21b6',
+      900: '#4c1d95',
+    },
+  },
+  components: {
+    Button: {
+      baseStyle: {
+        borderRadius: 'var(--radius)',
+      },
+    },
+    Input: {
+      baseStyle: {
+        field: {
+          borderRadius: 'var(--radius)',
+          bg: 'var(--input)',
+          borderColor: 'var(--border)',
+          _focus: {
+            borderColor: 'var(--ring)',
+            boxShadow: '0 0 0 2px var(--ring)',
+          },
+        },
+      },
+    },
+    Card: {
+      baseStyle: {
+        container: {
+          bg: 'var(--card)',
+          borderRadius: 'var(--radius)',
+          borderColor: 'var(--border)',
+        },
+      },
+    },
+  },
+})
 
+function App() {
   return (
-    <>
-      <Box 
-        pb={showBottomNav ? "70px" : 0} // Add padding when BottomNav is shown
-        minH="100vh"
-        bg="gray.50"
-        _dark={{ bg: "gray.900" }}
-      >
-        <Container 
-          maxW="container.sm" 
-          py={4}
-          px={4}
-        >
+    <ChakraProvider theme={theme}>
+      <Router>
+        <div className="app-container">
           <Routes>
             <Route path="/" element={<Login />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/create-group" element={<CreateGroup />} />
             <Route path="/join-group" element={<JoinGroup />} />
+            <Route path="/add-expense" element={<AddExpense onExpenseAdded={() => {}} />} />
             <Route path="/analytics" element={<Analytics />} />
-            <Route path="/add-transaction" element={<AddExpense onExpenseAdded={() => {}} />} />
           </Routes>
-        </Container>
-      </Box>
-      {showBottomNav && <BottomNav />}
-    </>
-  )
-}
-
-function App() {
-  useEffect(() => {
-    initializeStorage()
-  }, [])
-
-  return (
-    <ChakraProvider>
-      <Router>
-        <AppContent />
+          <BottomNav />
+        </div>
       </Router>
     </ChakraProvider>
   )
