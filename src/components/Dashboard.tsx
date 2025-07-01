@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Box,
@@ -21,41 +21,65 @@ import {
   useDisclosure,
   Badge,
   SimpleGrid,
+  Spinner,
 } from '@chakra-ui/react'
 import type { User, CoupleGroup } from '../types'
-import { getUser, getGroupById, saveUser, saveGroup, getGroups } from '../utils/storage'
+import { getUser, getGroupById, saveUser, saveGroup, getGroups, saveGroups } from '../utils/storage'
+
+const REFRESH_INTERVAL = 5000 // Refresh every 5 seconds
 
 const Dashboard = () => {
   const [username, setUsername] = useState('')
   const [user, setUser] = useState<User | null>(null)
   const [group, setGroup] = useState<CoupleGroup | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const navigate = useNavigate()
   const toast = useToast()
   const { hasCopied, onCopy } = useClipboard(group?.id || '')
   const { isOpen, onOpen, onClose } = useDisclosure()
   const cancelRef = useRef<HTMLButtonElement>(null)
 
-  const loadGroupData = () => {
-    const storedUser = localStorage.getItem('current_user')
-    const currentUser = storedUser ? JSON.parse(storedUser) : null
+  const loadGroupData = useCallback(async () => {
+    try {
+      const storedUser = localStorage.getItem('current_user')
+      const currentUser = storedUser ? JSON.parse(storedUser) : null
 
-    if (!currentUser) {
-      navigate('/')
-      return
+      if (!currentUser) {
+        navigate('/')
+        return
+      }
+
+      setUsername(currentUser.username)
+      setUser(currentUser)
+
+      if (currentUser.groupId) {
+        const userGroup = await getGroupById(currentUser.groupId)
+        if (userGroup) {
+          setGroup(userGroup)
+        }
+      }
+    } catch (error) {
+      console.error('Error loading group data:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to load group data. Please refresh the page.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      })
+    } finally {
+      setIsLoading(false)
     }
-
-    setUsername(currentUser.username)
-    setUser(currentUser)
-
-    if (currentUser.groupId) {
-      const userGroup = getGroupById(currentUser.groupId)
-      setGroup(userGroup)
-    }
-  }
+  }, [navigate, toast])
 
   useEffect(() => {
     loadGroupData()
-  }, [navigate])
+    
+    // Set up auto-refresh
+    const intervalId = setInterval(loadGroupData, REFRESH_INTERVAL)
+    
+    return () => clearInterval(intervalId)
+  }, [loadGroupData])
 
   const handleCreateGroup = () => {
     navigate('/create-group')
@@ -65,45 +89,68 @@ const Dashboard = () => {
     navigate('/join-group')
   }
 
-  const handleLeaveGroup = () => {
+  const handleLeaveGroup = async () => {
     if (!user || !group || !username) return
 
-    // Remove user from group
-    const updatedGroup = {
-      ...group,
-      members: group.members.filter(member => member !== user.username)
-    }
+    try {
+      setIsLoading(true)
+      
+      // Remove user from group
+      const updatedGroup = {
+        ...group,
+        members: group.members.filter(member => member !== user.username)
+      }
 
-    // Update or remove group based on remaining members
-    const groups = getGroups()
-    if (updatedGroup.members.length === 0) {
-      // If no members left, remove the group
-      const filteredGroups = groups.filter(g => g.id !== group.id)
-      localStorage.setItem('expense_tracker_all_groups', JSON.stringify(filteredGroups))
-    } else {
-      // Update the group with remaining member
-      saveGroup(updatedGroup)
-    }
+      // Update or remove group based on remaining members
+      const groups = await getGroups()
+      if (updatedGroup.members.length === 0) {
+        // If no members left, remove the group
+        const filteredGroups = groups.filter((g: CoupleGroup) => g.id !== group.id)
+        await saveGroups(filteredGroups)
+      } else {
+        // Update the group with remaining member
+        await saveGroup(updatedGroup)
+      }
 
-    // Update user
-    const updatedUser = {
-      ...user,
-      groupId: null
-    }
-    saveUser(updatedUser)
-    localStorage.setItem('current_user', JSON.stringify(updatedUser))
-    
-    toast({
-      title: 'Left Group',
-      description: 'You have successfully left the group',
-      status: 'info',
-      duration: 3000,
-      isClosable: true,
-    })
+      // Update user
+      const updatedUser = {
+        ...user,
+        groupId: null
+      }
+      await saveUser(updatedUser)
+      localStorage.setItem('current_user', JSON.stringify(updatedUser))
+      
+      toast({
+        title: 'Left Group',
+        description: 'You have successfully left the group',
+        status: 'info',
+        duration: 3000,
+        isClosable: true,
+      })
 
-    setGroup(null)
-    setUser(updatedUser)
-    onClose()
+      setGroup(null)
+      setUser(updatedUser)
+      onClose()
+    } catch (error) {
+      console.error('Error leaving group:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to leave group. Please try again.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
+        <Spinner size="xl" />
+      </Box>
+    )
   }
 
   if (!user) {
@@ -141,7 +188,7 @@ const Dashboard = () => {
               <Button ref={cancelRef} onClick={onClose}>
                 Cancel
               </Button>
-              <Button colorScheme="red" onClick={handleLeaveGroup} ml={3}>
+              <Button colorScheme="red" onClick={handleLeaveGroup} ml={3} isLoading={isLoading}>
                 Leave Group
               </Button>
             </AlertDialogFooter>
@@ -199,57 +246,44 @@ const Dashboard = () => {
                 <Input
                   value={group.id}
                   isReadOnly
-                  bg="gray.50"
-                  fontSize="xs"
+                  pr="4.5rem"
                 />
                 <InputRightElement width="4.5rem">
-                  <Button h="1.5rem" size="xs" onClick={onCopy}>
+                  <Button h="1.75rem" size="sm" onClick={onCopy}>
                     {hasCopied ? 'Copied!' : 'Copy'}
                   </Button>
                 </InputRightElement>
               </InputGroup>
             </Box>
 
-            <Box w="full">
-              <Heading size="md" mb={3}>Recent Transactions</Heading>
-              {group.expenses.length === 0 ? (
-                <Box p={4} bg="white" borderRadius="lg" shadow="sm">
-                  <Text>No transactions yet.</Text>
-                </Box>
-              ) : (
-                <VStack spacing={2} align="stretch">
+            {group.expenses.length > 0 && (
+              <Box w="full" p={4} bg="white" borderRadius="lg" shadow="sm">
+                <Heading size="sm" mb={3}>Recent Transactions</Heading>
+                <VStack spacing={3} align="stretch">
                   {[...group.expenses]
                     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                     .slice(0, 5)
-                    .map(transaction => (
-                      <Box
-                        key={transaction.id}
-                        p={3}
-                        bg="white"
-                        borderRadius="lg"
-                        shadow="sm"
-                      >
-                        <HStack justify="space-between" mb={1}>
-                          <Text fontWeight="medium">{transaction.description}</Text>
-                          <Badge
-                            colorScheme={transaction.type === 'expense' ? 'red' : 'green'}
-                          >
-                            ${transaction.amount.toFixed(2)}
-                          </Badge>
-                        </HStack>
-                        <HStack justify="space-between">
-                          <Text fontSize="sm" color="gray.600">
-                            {transaction.category} • {transaction.paidBy}
-                          </Text>
+                    .map(expense => (
+                      <HStack key={expense.id} justify="space-between">
+                        <VStack align="start" spacing={0}>
+                          <Text fontSize="sm">{expense.description}</Text>
                           <Text fontSize="xs" color="gray.500">
-                            {new Date(transaction.date).toLocaleDateString()}
+                            by {expense.paidBy} • {new Date(expense.date).toLocaleDateString()}
+                          </Text>
+                        </VStack>
+                        <HStack spacing={2}>
+                          <Badge colorScheme={expense.type === 'expense' ? 'red' : 'green'}>
+                            {expense.type}
+                          </Badge>
+                          <Text fontWeight="bold" color={expense.type === 'expense' ? 'red.500' : 'green.500'}>
+                            ${expense.amount.toFixed(2)}
                           </Text>
                         </HStack>
-                      </Box>
+                      </HStack>
                     ))}
                 </VStack>
-              )}
-            </Box>
+              </Box>
+            )}
           </VStack>
         )}
       </VStack>

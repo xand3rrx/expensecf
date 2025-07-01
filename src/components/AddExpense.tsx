@@ -17,7 +17,6 @@ import {
 import { v4 as uuidv4 } from 'uuid'
 import type { Expense, CoupleGroup } from '../types'
 import { getUser, getGroupById, saveGroup } from '../utils/storage'
-import { saveGroup as saveGroupCloudflare } from '../utils/cloudflareStorage'
 
 interface AddExpenseProps {
   onExpenseAdded: () => void
@@ -46,81 +45,95 @@ const AddExpense: React.FC<AddExpenseProps> = ({ onExpenseAdded }) => {
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState(EXPENSE_CATEGORIES[0])
   const [type, setType] = useState<'expense' | 'addition'>('expense')
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const toast = useToast()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true)
 
-    // Get current user from local storage
-    const storedUser = localStorage.getItem('current_user')
-    const currentUser = storedUser ? JSON.parse(storedUser) : null
+    try {
+      // Get current user from local storage
+      const storedUser = localStorage.getItem('current_user')
+      const currentUser = storedUser ? JSON.parse(storedUser) : null
 
-    if (!currentUser || !currentUser.groupId) {
+      if (!currentUser || !currentUser.groupId) {
+        toast({
+          title: 'Error',
+          description: 'You must be in a group to add transactions',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        })
+        return
+      }
+
+      const group = await getGroupById(currentUser.groupId)
+      if (!group) {
+        toast({
+          title: 'Error',
+          description: 'Group not found',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        })
+        return
+      }
+
+      const parsedAmount = parseFloat(amount)
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        toast({
+          title: 'Error',
+          description: 'Please enter a valid amount greater than 0',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        })
+        return
+      }
+
+      const newTransaction: Expense = {
+        id: uuidv4(),
+        description: description.trim(),
+        amount: parsedAmount,
+        category,
+        paidBy: currentUser.username,
+        date: new Date().toISOString(),
+        type
+      }
+
+      const updatedGroup: CoupleGroup = {
+        ...group,
+        expenses: [...group.expenses, newTransaction]
+      }
+
+      // Save to storage (which will handle both local and Cloudflare)
+      await saveGroup(updatedGroup)
+      
+      setDescription('')
+      setAmount('')
+      setCategory(type === 'expense' ? EXPENSE_CATEGORIES[0] : ADDITION_CATEGORIES[0])
+      onExpenseAdded()
+
+      toast({
+        title: 'Success',
+        description: `${type === 'expense' ? 'Expense' : 'Addition'} added successfully`,
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      })
+    } catch (error) {
+      console.error('Error adding transaction:', error)
       toast({
         title: 'Error',
-        description: 'You must be in a group to add transactions',
+        description: 'Failed to add transaction. Please try again.',
         status: 'error',
         duration: 3000,
         isClosable: true,
       })
-      return
+    } finally {
+      setIsSubmitting(false)
     }
-
-    const group = getGroupById(currentUser.groupId)
-    if (!group) {
-      toast({
-        title: 'Error',
-        description: 'Group not found',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      })
-      return
-    }
-
-    const parsedAmount = parseFloat(amount)
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      toast({
-        title: 'Error',
-        description: 'Please enter a valid amount greater than 0',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      })
-      return
-    }
-
-    const newTransaction: Expense = {
-      id: uuidv4(),
-      description: description.trim(),
-      amount: parsedAmount,
-      category,
-      paidBy: currentUser.username,
-      date: new Date().toISOString(),
-      type
-    }
-
-    const updatedGroup: CoupleGroup = {
-      ...group,
-      expenses: [...group.expenses, newTransaction]
-    }
-
-    // Save to both storages
-    await saveGroupCloudflare(updatedGroup)
-    saveGroup(updatedGroup)
-    
-    setDescription('')
-    setAmount('')
-    setCategory(type === 'expense' ? EXPENSE_CATEGORIES[0] : ADDITION_CATEGORIES[0])
-    onExpenseAdded()
-
-    toast({
-      title: 'Success',
-      description: `${type === 'expense' ? 'Expense' : 'Addition'} added successfully`,
-      status: 'success',
-      duration: 3000,
-      isClosable: true,
-    })
   }
 
   // Update category options when type changes
@@ -173,6 +186,8 @@ const AddExpense: React.FC<AddExpenseProps> = ({ onExpenseAdded }) => {
           type="submit" 
           colorScheme={type === 'expense' ? "red" : "green"} 
           width="full"
+          isLoading={isSubmitting}
+          loadingText="Adding..."
         >
           Add {type === 'expense' ? 'Expense' : 'Addition'}
         </Button>

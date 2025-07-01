@@ -1,4 +1,5 @@
 import type { CoupleGroup, User } from '../types'
+import * as cloudflareStorage from './cloudflareStorage'
 
 const STORAGE_KEYS = {
   SHARED_GROUPS: 'expense_tracker_all_groups',
@@ -7,99 +8,100 @@ const STORAGE_KEYS = {
 }
 
 // Initialize storage on app start
-export const initializeStorage = () => {
-  const groupsStr = localStorage.getItem(STORAGE_KEYS.SHARED_GROUPS)
-  if (!groupsStr || groupsStr === 'null') {
-    localStorage.setItem(STORAGE_KEYS.SHARED_GROUPS, JSON.stringify([]))
-    console.log('Initialized groups storage with empty array')
-  }
+export const initializeStorage = async () => {
+  // Fetch latest groups from Cloudflare
+  const cloudflareGroups = await cloudflareStorage.getGroups()
+  localStorage.setItem(STORAGE_KEYS.SHARED_GROUPS, JSON.stringify(cloudflareGroups))
+  console.log('Initialized groups storage with Cloudflare data:', cloudflareGroups)
 }
 
-export const saveUser = (user: User) => {
+export const saveUser = async (user: User) => {
   localStorage.setItem(STORAGE_KEYS.getUserKey(user.username), JSON.stringify(user))
+  await cloudflareStorage.saveUser(user)
   console.log(`Saved user data for ${user.username}:`, user)
 }
 
-export const getUser = (username: string): User | null => {
+export const getUser = async (username: string): Promise<User | null> => {
+  // Try Cloudflare first
+  const cloudflareUser = await cloudflareStorage.getUser(username)
+  if (cloudflareUser) {
+    // Update local storage
+    localStorage.setItem(STORAGE_KEYS.getUserKey(username), JSON.stringify(cloudflareUser))
+    console.log(`Retrieved user data for ${username} from Cloudflare:`, cloudflareUser)
+    return cloudflareUser
+  }
+
+  // Fallback to local storage
   const user = localStorage.getItem(STORAGE_KEYS.getUserKey(username))
-  console.log(`Retrieved user data for ${username}:`, user)
+  console.log(`Retrieved user data for ${username} from local storage:`, user)
   return user ? JSON.parse(user) : null
 }
 
-export const saveGroup = (group: CoupleGroup) => {
-  // Get existing groups
-  const existingGroups = getGroups()
+export const saveGroup = async (group: CoupleGroup) => {
+  // Save to Cloudflare first
+  await cloudflareStorage.saveGroup(group)
   
-  // Update or add the group
-  const existingGroupIndex = existingGroups.findIndex(g => g.id === group.id)
-  if (existingGroupIndex >= 0) {
-    existingGroups[existingGroupIndex] = group
-  } else {
-    existingGroups.push(group)
-  }
-  
-  // Save updated groups
-  localStorage.setItem(STORAGE_KEYS.SHARED_GROUPS, JSON.stringify(existingGroups))
-  console.log('Saved group:', group)
-  console.log('All groups:', existingGroups)
+  // Then update local storage with latest data from Cloudflare
+  const cloudflareGroups = await cloudflareStorage.getGroups()
+  localStorage.setItem(STORAGE_KEYS.SHARED_GROUPS, JSON.stringify(cloudflareGroups))
+  console.log('Saved group and synced with Cloudflare:', group)
+  console.log('All groups:', cloudflareGroups)
 }
 
-export const saveGroups = (groups: CoupleGroup[]) => {
-  localStorage.setItem(STORAGE_KEYS.SHARED_GROUPS, JSON.stringify(groups))
-  console.log('Saved all groups:', groups)
-}
-
-export const getGroups = (): CoupleGroup[] => {
-  const groupsStr = localStorage.getItem(STORAGE_KEYS.SHARED_GROUPS)
-  console.log('Raw groups data:', groupsStr)
-  
-  if (!groupsStr || groupsStr === 'null') {
-    console.log('No groups found, returning empty array')
-    return []
+export const saveGroups = async (groups: CoupleGroup[]) => {
+  // Save each group to Cloudflare
+  for (const group of groups) {
+    await cloudflareStorage.saveGroup(group)
   }
   
-  try {
-    const groups = JSON.parse(groupsStr)
-    if (Array.isArray(groups)) {
-      console.log('Retrieved groups:', groups)
-      return groups
-    } else {
-      console.log('Groups data is not an array, returning empty array')
-      return []
-    }
-  } catch (error) {
-    console.error('Error parsing groups:', error)
-    return []
-  }
+  // Update local storage with latest data
+  const cloudflareGroups = await cloudflareStorage.getGroups()
+  localStorage.setItem(STORAGE_KEYS.SHARED_GROUPS, JSON.stringify(cloudflareGroups))
+  console.log('Saved all groups and synced with Cloudflare:', cloudflareGroups)
 }
 
-export const getUserGroups = (username: string): CoupleGroup[] => {
-  const allGroups = getGroups()
+export const getGroups = async (): Promise<CoupleGroup[]> => {
+  // Always fetch latest from Cloudflare
+  const cloudflareGroups = await cloudflareStorage.getGroups()
+  
+  // Update local storage
+  localStorage.setItem(STORAGE_KEYS.SHARED_GROUPS, JSON.stringify(cloudflareGroups))
+  console.log('Retrieved groups from Cloudflare:', cloudflareGroups)
+  return cloudflareGroups
+}
+
+export const getUserGroups = async (username: string): Promise<CoupleGroup[]> => {
+  const allGroups = await getGroups()
   const userGroups = allGroups.filter(group => group.members.includes(username))
   console.log(`Retrieved groups for ${username}:`, userGroups)
   return userGroups
 }
 
-export const getGroupById = (id: string): CoupleGroup | null => {
+export const getGroupById = async (id: string): Promise<CoupleGroup | null> => {
   console.log(`Searching for group ${id}`)
-  const groups = getGroups()
-  const group = groups.find(g => g.id === id)
+  const group = await cloudflareStorage.getGroupById(id)
   console.log(`Found group:`, group)
-  return group || null
+  return group
 }
 
-export const clearStorage = (username: string) => {
+export const clearStorage = async (username: string) => {
   localStorage.removeItem(STORAGE_KEYS.getUserKey(username))
+  await cloudflareStorage.clearStorage(username)
   console.log(`Cleared storage for ${username}`)
 }
 
-export const getAllGroups = (): CoupleGroup[] => {
-  return getGroups()
+export const getAllGroups = async (): Promise<CoupleGroup[]> => {
+  return await getGroups()
 }
 
-export const debugStorage = () => {
+export const debugStorage = async () => {
   console.group('Storage Debug Info')
   console.log('Current domain:', window.location.hostname)
+  
+  // Debug Cloudflare KV storage
+  await cloudflareStorage.debugStorage()
+  
+  // Debug local storage
   console.log('All localStorage keys:')
   const allKeys = []
   for (let i = 0; i < localStorage.length; i++) {
@@ -108,17 +110,6 @@ export const debugStorage = () => {
       allKeys.push(key)
       const value = localStorage.getItem(key)
       console.log(`${key}:`, value)
-      if (key === STORAGE_KEYS.SHARED_GROUPS) {
-        try {
-          if (value && value !== 'null') {
-            console.log(`Parsed groups:`, JSON.parse(value))
-          } else {
-            console.log('Groups storage is null or empty')
-          }
-        } catch (e) {
-          console.error(`Error parsing groups:`, e)
-        }
-      }
     }
   }
   console.log('All keys:', allKeys)
