@@ -12,7 +12,8 @@ import {
   useToast,
 } from '@chakra-ui/react'
 import type { User } from '../types'
-import { saveUser, getUser } from '../utils/cloudflareStorage'
+import { saveUser as saveUserCloudflare, getUser as getUserCloudflare } from '../utils/cloudflareStorage'
+import { saveUser as saveUserLocal } from '../utils/storage'
 
 const Login = () => {
   const [username, setUsername] = useState('')
@@ -34,25 +35,32 @@ const Login = () => {
           duration: 3000,
           isClosable: true,
         })
+        setIsLoading(false)
         return
       }
 
-      // Check if user already exists
-      const existingUser = await getUser(trimmedUsername)
+      // Check if user already exists in Cloudflare KV
+      const existingUser = await getUserCloudflare(trimmedUsername)
+      let userData: User
+
       if (existingUser) {
-        // If user exists, just log them in
-        await saveUser(existingUser)
-        localStorage.setItem('current_user', JSON.stringify(existingUser))
+        // If user exists, use their data
+        userData = existingUser
       } else {
         // Create new user
-        const user: User = {
+        userData = {
           username: trimmedUsername,
           groupId: null,
         }
-        await saveUser(user)
-        localStorage.setItem('current_user', JSON.stringify(user))
+        // Save to Cloudflare KV
+        await saveUserCloudflare(userData)
       }
+
+      // Save to local storage
+      saveUserLocal(userData)
+      localStorage.setItem('current_user', JSON.stringify(userData))
       
+      // Navigate after all storage operations are complete
       navigate('/dashboard')
     } catch (error) {
       console.error('Error during login:', error)
