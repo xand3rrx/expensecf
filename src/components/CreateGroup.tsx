@@ -12,7 +12,8 @@ import {
 } from '@chakra-ui/react'
 import { v4 as uuidv4 } from 'uuid'
 import type { User, CoupleGroup } from '../types'
-import { saveUser, saveGroup, debugStorage } from '../utils/cloudflareStorage'
+import { saveUser as saveUserCloudflare, saveGroup, debugStorage } from '../utils/cloudflareStorage'
+import { saveUser as saveUserLocal } from '../utils/storage'
 
 const CreateGroup = () => {
   const [groupName, setGroupName] = useState('')
@@ -65,17 +66,18 @@ const CreateGroup = () => {
         groupId: newGroup.id
       }
 
-      // Save the group and user
+      // Save to Cloudflare KV
       const [groupSaved, userSaved] = await Promise.all([
         saveGroup(newGroup),
-        saveUser(updatedUser)
+        saveUserCloudflare(updatedUser)
       ])
 
       if (!groupSaved || !userSaved) {
         throw new Error('Failed to save group or user data')
       }
 
-      // Update local storage for current user
+      // Save to local storage
+      saveUserLocal(updatedUser)
       localStorage.setItem('current_user', JSON.stringify(updatedUser))
 
       // Debug: Log the current storage state
