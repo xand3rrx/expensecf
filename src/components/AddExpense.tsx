@@ -13,6 +13,7 @@ import {
 import { v4 as uuidv4 } from 'uuid'
 import type { Expense, CoupleGroup } from '../types'
 import { getUser, getGroupById, saveGroup } from '../utils/storage'
+import { saveGroup as saveGroupCloudflare } from '../utils/cloudflareStorage'
 
 interface AddExpenseProps {
   onExpenseAdded: () => void
@@ -34,11 +35,14 @@ const AddExpense: React.FC<AddExpenseProps> = ({ onExpenseAdded }) => {
   const [category, setCategory] = useState(EXPENSE_CATEGORIES[0])
   const toast = useToast()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const user = getUser()
-    if (!user || !user.groupId) {
+    // Get current user from local storage
+    const storedUser = localStorage.getItem('current_user')
+    const currentUser = storedUser ? JSON.parse(storedUser) : null
+
+    if (!currentUser || !currentUser.groupId) {
       toast({
         title: 'Error',
         description: 'You must be in a group to add expenses',
@@ -49,7 +53,7 @@ const AddExpense: React.FC<AddExpenseProps> = ({ onExpenseAdded }) => {
       return
     }
 
-    const group = getGroupById(user.groupId)
+    const group = getGroupById(currentUser.groupId)
     if (!group) {
       toast({
         title: 'Error',
@@ -66,7 +70,7 @@ const AddExpense: React.FC<AddExpenseProps> = ({ onExpenseAdded }) => {
       description: description.trim(),
       amount: parseFloat(amount),
       category,
-      paidBy: user.username,
+      paidBy: currentUser.username,
       date: new Date().toISOString(),
     }
 
@@ -75,7 +79,10 @@ const AddExpense: React.FC<AddExpenseProps> = ({ onExpenseAdded }) => {
       expenses: [...group.expenses, newExpense]
     }
 
+    // Save to both storages
+    await saveGroupCloudflare(updatedGroup)
     saveGroup(updatedGroup)
+    
     setDescription('')
     setAmount('')
     setCategory(EXPENSE_CATEGORIES[0])
