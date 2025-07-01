@@ -12,8 +12,8 @@ import {
   Text,
 } from '@chakra-ui/react'
 import type { User, CoupleGroup } from '../types'
-import { getUser as getUserCloudflare, saveUser as saveUserCloudflare, debugStorage, getGroupById, saveGroup } from '../utils/cloudflareStorage'
-import { saveUser as saveUserLocal } from '../utils/storage'
+import { getUser as getUserCloudflare, saveUser as saveUserCloudflare, debugStorage, getGroupById, saveGroup as saveGroupCloudflare, getGroups as getGroupsCloudflare } from '../utils/cloudflareStorage'
+import { saveUser as saveUserLocal, saveGroup as saveGroupLocal } from '../utils/storage'
 
 const JoinGroup = () => {
   const [groupId, setGroupId] = useState('')
@@ -138,9 +138,9 @@ const JoinGroup = () => {
         groupId: foundGroup.id
       }
 
-      // Save the updated group and user to Cloudflare KV
+      // Save to Cloudflare KV
       const [groupSaved, userSaved] = await Promise.all([
-        saveGroup(updatedGroup),
+        saveGroupCloudflare(updatedGroup),
         saveUserCloudflare(updatedUser)
       ])
 
@@ -150,7 +150,12 @@ const JoinGroup = () => {
 
       // Save to local storage
       saveUserLocal(updatedUser)
+      saveGroupLocal(updatedGroup)
       localStorage.setItem('current_user', JSON.stringify(updatedUser))
+
+      // Sync all groups from Cloudflare KV to local storage
+      const allGroups = await getGroupsCloudflare()
+      localStorage.setItem('expense_tracker_all_groups', JSON.stringify(allGroups))
 
       // Debug: Log final state
       console.log('Updated group:', updatedGroup)

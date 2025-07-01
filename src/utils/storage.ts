@@ -27,32 +27,26 @@ export const getUser = (username: string): User | null => {
 }
 
 export const saveGroup = (group: CoupleGroup) => {
-  const existingGroupsStr = localStorage.getItem(STORAGE_KEYS.SHARED_GROUPS)
-  let existingGroups: CoupleGroup[] = []
+  // Get existing groups
+  const existingGroups = getGroups()
   
-  if (existingGroupsStr && existingGroupsStr !== 'null') {
-    try {
-      existingGroups = JSON.parse(existingGroupsStr)
-      if (!Array.isArray(existingGroups)) {
-        existingGroups = []
-      }
-    } catch (error) {
-      console.error('Error parsing existing groups:', error)
-      existingGroups = []
-    }
-  }
-  
+  // Update or add the group
   const existingGroupIndex = existingGroups.findIndex(g => g.id === group.id)
-  
   if (existingGroupIndex >= 0) {
     existingGroups[existingGroupIndex] = group
   } else {
     existingGroups.push(group)
   }
   
+  // Save updated groups
   localStorage.setItem(STORAGE_KEYS.SHARED_GROUPS, JSON.stringify(existingGroups))
   console.log('Saved group:', group)
   console.log('All groups:', existingGroups)
+}
+
+export const saveGroups = (groups: CoupleGroup[]) => {
+  localStorage.setItem(STORAGE_KEYS.SHARED_GROUPS, JSON.stringify(groups))
+  console.log('Saved all groups:', groups)
 }
 
 export const getGroups = (): CoupleGroup[] => {

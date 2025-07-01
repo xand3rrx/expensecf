@@ -12,8 +12,8 @@ import {
 } from '@chakra-ui/react'
 import { v4 as uuidv4 } from 'uuid'
 import type { User, CoupleGroup } from '../types'
-import { saveUser as saveUserCloudflare, saveGroup, debugStorage } from '../utils/cloudflareStorage'
-import { saveUser as saveUserLocal } from '../utils/storage'
+import { saveUser as saveUserCloudflare, saveGroup as saveGroupCloudflare, getGroups as getGroupsCloudflare, debugStorage } from '../utils/cloudflareStorage'
+import { saveUser as saveUserLocal, saveGroup as saveGroupLocal } from '../utils/storage'
 
 const CreateGroup = () => {
   const [groupName, setGroupName] = useState('')
@@ -68,7 +68,7 @@ const CreateGroup = () => {
 
       // Save to Cloudflare KV
       const [groupSaved, userSaved] = await Promise.all([
-        saveGroup(newGroup),
+        saveGroupCloudflare(newGroup),
         saveUserCloudflare(updatedUser)
       ])
 
@@ -78,7 +78,12 @@ const CreateGroup = () => {
 
       // Save to local storage
       saveUserLocal(updatedUser)
+      saveGroupLocal(newGroup)
       localStorage.setItem('current_user', JSON.stringify(updatedUser))
+
+      // Sync all groups from Cloudflare KV to local storage
+      const allGroups = await getGroupsCloudflare()
+      localStorage.setItem('expense_tracker_all_groups', JSON.stringify(allGroups))
 
       // Debug: Log the current storage state
       console.log('Created new group:', newGroup)
